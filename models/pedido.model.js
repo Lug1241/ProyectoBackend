@@ -45,8 +45,9 @@ const PedidoSchema = new mongoose.Schema({
     },
     estado: {
         type: String,
-        enum: ["Solicitado", "En desarrollo", "Terminado","Rechazado"]
+        enum: ["Solicitado", "En desarrollo", "Terminado","Rechazado", "Realizado"]
     },
+   
 
     cliente_id: {
         type: mongoose.Schema.Types.ObjectId,

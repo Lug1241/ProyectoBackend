@@ -1,4 +1,5 @@
 const Factura = require('../models/factura.model')
+const Servicio= require('../models/servicio.model')
 
 const createFactura = async (req, res) => {
     const factura = req.body
@@ -25,6 +26,8 @@ const deleteFactura = async (req, res) => {
     const id = req.params.id
     try {
         const result = await Factura.findByIdAndDelete(id)
+        
+        const servicosDelete= await Servicio.deleteMany({factura_id: result._id})
         if (!result) {
             res.status(400).json({
                 message: `Factura no encontrada`,
@@ -50,6 +53,7 @@ const deleteFactura = async (req, res) => {
 
 const getFacturasBycliente = async (req, res) => {
     const id= req.params.id
+    console.log("este fue el id", id)
     try {
         const result = await Factura.find({ cliente_id: id })
         if (!result) {
@@ -101,10 +105,38 @@ const getFacturas = async (_, res) => {
         });
     }
 }
+const updateFactura= async (req, res) => {
+    const id= req.params.id
+    const factura=req.body
+    try {
+        const result = await Factura.findByIdAndUpdate({ _id: id }, factura, { new: true })
+        if (!result || result.length==0) {
+            return res.status(404).json({
+                message: "No se encontró la factura.",
+                success: false,
+            });
+        }
+
+        res.status(200).json({
+            message: "Factura actualizada exitosamente.",
+            success: true,
+            data: result,
+        });
+    } catch (error) {
+        console.error("Error al obtener factura:", error);
+
+        res.status(500).json({
+            message: "Ocurrió un error al obtener la factura.",
+            success: false,
+            error: error.message,
+        });
+    }
+}
 
 module.exports={
     createFactura,
     deleteFactura,
     getFacturasBycliente,
-    getFacturas
+    getFacturas,
+    updateFactura
 }

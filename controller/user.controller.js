@@ -1,10 +1,11 @@
+require("dotenv").config();
 const User = require('../models/user.model')
 const Pedido=require('../models/pedido.model')
 const jwt = require("jsonwebtoken")
 const bcrypt = require("bcryptjs")
 
-const generateToken=(id)=>{
-    return jwt.sign({id}, "hola", {expiresIn: '30d'})
+const generateToken=(params)=>{
+    return jwt.sign(params,process.env.JWT_SECRET, {expiresIn: '30d'})
 }
 const createUser = async (req, res) => {
     const user = req.body
@@ -17,7 +18,7 @@ const createUser = async (req, res) => {
             console.log("se esta ejecuatndo")
             const userFound = await User.findOne({username: user.username});
             if (userFound){
-                res.status(400).json({message: 'User already exist'});
+                return res.status(400).json({message: 'User already exist'});
                 }     
         }
         try {
@@ -28,7 +29,8 @@ const createUser = async (req, res) => {
                 user.password=hashedPassword
             }
             
-            const result = await User.create(user)
+            const newUser = await User.create(user)
+            const result= await User.findById(newUser._id).select().select('-password')
             res.status(200).json({
                 message: `${user.profile} creado exitosamente`,
                 success: true,
@@ -51,9 +53,13 @@ const createUser = async (req, res) => {
 }
 const loginUser= async (req, res) =>{
     const {username, password} = req.body;
-    const userFound = await User.findOne({username});
+    const userFound = await User.findOne({ username })
+     // Excluye la contraseña directamente
+    
     //console.log('Usuario encontrado: ', userFound);
-    if (userFound && (await bcrypt.compare(password, userFound.password))){res.json(userFound)
+    if (userFound && (await bcrypt.compare(password, userFound.password))){
+        const { password: _, ...userWithoutPassword } = userFound.toObject();
+        res.json({message: 'Login user', user: userFound,token: generateToken({id: userFound._id})})
     }else{
     res.status(400).json({message: 'Login Failed'})
     }
@@ -88,7 +94,7 @@ const editUser = async (req, res) => {
 const deleteUser = async (req, res) => {
     const id = req.params.id
     try {
-        const result = await User.findByIdAndDelete(id)
+        const result = await User.findByIdAndDelete(id).select('-password')
         const pedidosCliente= await Pedido.deleteMany({cliente_id: result._id})
         
         if (!result) {
@@ -116,7 +122,7 @@ const deleteUser = async (req, res) => {
 
 const getTecnicos = async (_, res) => {
     try {
-        const result = await User.find({ profile: "tecnico" })
+        const result = await User.find({ profile: "tecnico" }).select('-password')
         if (!result || result.length === 0) {
             return res.status(404).json({
                 message: "No se encontraron técnicos.",
@@ -142,7 +148,7 @@ const getTecnicos = async (_, res) => {
 
 const getClientes = async (_, res) => {
     try {
-        const result = await User.find({ profile: "cliente" })
+        const result = await User.find({ profile: "cliente" }).select('-password')
         if (!result || result.length === 0) {
             return res.status(404).json({
                 message: "No se encontraron clientes.",
@@ -166,38 +172,13 @@ const getClientes = async (_, res) => {
     }
 }
 
-const getUser =  async(req, res) => {
-    const username = req.params.username
-    try {
-        const result = await User.findOne({username})
-        if (!result) {
-            return res.status(404).json({
-                message: "Usuario no encontrado.",
-                success: false,
-            });
-        }
 
-        res.status(200).json({
-            message: `Usuario ${result.nombre} encontrado`,
-            success: true,
-            data: result,
-        });
-    } catch (error) {
-        console.error("Error al obtener clientes:", error);
-
-        res.status(500).json({
-            message: "Ocurrió un error al obtener al usuario.",
-            success: false,
-            error: error.message,
-        });
-    }
-}
 const getUserByID =  async(req, res) => {
     const id = req.params.id
     console.log(id)
-    console.log("Hola mundo")
+    
     try {
-        const result = await User.findById(id)
+        const result = await User.findById(id).select('-password')
         if (!result) {
             console.log("hola")
             return res.status(404).json({
@@ -211,7 +192,7 @@ const getUserByID =  async(req, res) => {
             success: true,
             data: result,
         });
-        console.log("Esto fue lo que se envío",result)
+        
     } catch (error) {
         console.error("Error al obtener clientes:", error);
 
@@ -222,12 +203,13 @@ const getUserByID =  async(req, res) => {
         });
     }
 }
+    
 const getUserByEmail =  async(req, res) => {
     const email = req.params.id
     console.log(id)
-    console.log("Hola mundo")
+    
     try {
-        const result = await User.findOne({email})
+        const result = await User.findOne({email}).select('-password')
         if (!result) {
             console.log("hola")
             return res.status(404).json({
@@ -241,7 +223,7 @@ const getUserByEmail =  async(req, res) => {
             success: true,
             data: result,
         });
-        console.log("Esto fue lo que se envío",result)
+        
     } catch (error) {
         console.error("Error al obtener clientes:", error);
 
@@ -255,7 +237,7 @@ const getUserByEmail =  async(req, res) => {
 const getUsers =  async(req, res) => {
     
     try {
-        const result = await User.find()
+        const result = await User.find().select('-password')
         if (!result) {
             return res.status(404).json({
                 message: "Usuario no encontrado.",
@@ -284,7 +266,7 @@ const getCoincidencias = async(req, res)=>{
      // Coincidencias insensibles a mayúsculas
     res.json(clientes);
     try {
-        const clientes = await User.find({ nombre: { $regex: query, $options: 'i' } , profile: "cliente"});
+        const clientes = await User.find({ nombre: { $regex: query, $options: 'i' } , profile: "cliente"}).select('-password');
         res.status(200).json(clientes);
     } catch (error) {
         console.error("Error al obtener coincidencias:", error);
@@ -300,7 +282,6 @@ const getCoincidencias = async(req, res)=>{
 module.exports = {
     getTecnicos,
     getClientes,
-    getUser,
     createUser,
     editUser,
     deleteUser,
